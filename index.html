@@ -1,0 +1,287 @@
+<!DOCTYPE html>
+<html lang="it">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>DEMOCODEX</title>
+<link rel="manifest" href="manifest.json">
+<meta name="theme-color" content="#d4af37">
+<link rel="icon" href="assets/icon192.png">
+<link rel="apple-touch-icon" href="assets/icon192.png">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="apple-mobile-web-app-title" content="DemoCodex">
+<style>
+  * { box-sizing: border-box; }
+  body {
+    margin: 0;
+    background: #000 url('assets/sfondo.jpg') center center / cover no-repeat fixed;
+    font-family: Georgia, serif;
+    color: #d4af37;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: flex-start;
+    min-height: 100vh;
+    padding: 40px 30px 30px;
+    gap: 14px;
+  }
+  .title {
+    margin: 0 0 30px 0;
+    font-size: 64px;
+    letter-spacing: 10px;
+    font-weight: normal;
+    color: #d4af37;
+    text-shadow: 0 0 20px rgba(212,175,55,0.6), 0 0 40px rgba(212,175,55,0.3);
+  }
+  .row {
+    display: flex;
+    flex-direction: row;
+    flex-wrap: nowrap;
+    align-items: center;
+    gap: 130px;
+  }
+  .panel-left {
+    display: grid;
+    grid-template-columns: repeat(3, 58px);
+    grid-template-rows: repeat(3, 58px);
+    gap: 10px;
+    flex: 0 0 auto;
+  }
+  .dot {
+    width: 58px;
+    height: 58px;
+    border-radius: 50%;
+    cursor: pointer;
+    background-size: cover;
+    background-position: center;
+    transition: transform 0.15s, box-shadow 0.15s;
+  }
+  .dot:hover { transform: scale(1.08); }
+  .dot.selected {
+    box-shadow: 0 0 12px rgba(255,255,255,0.9);
+  }
+  .stage {
+    position: relative;
+    width: 380px;
+    max-width: 58vw;
+    aspect-ratio: 410 / 670;
+    flex: 0 0 auto;
+  }
+  .stage img.bg { width: 100%; height: 100%; display: block; }
+  .slot {
+    position: absolute;
+    width: 46px;
+    height: 46px;
+    transform: translate(-50%, -50%);
+    border-radius: 50%;
+    cursor: pointer;
+    background: transparent;
+    border: none;
+  }
+  .slot .fill {
+    width: 100%;
+    height: 100%;
+    border-radius: 50%;
+    background: transparent;
+    background-size: cover;
+    background-position: center;
+    transition: background 0.15s;
+  }
+  .strip { width: 620px; max-width: 80vw; display: block; }
+  .controls { display: flex; gap: 16px; }
+  .btn {
+    font-family: Georgia, serif;
+    font-size: 15px;
+    letter-spacing: 1px;
+    background: transparent;
+    color: #d4af37;
+    border: 1px solid #d4af37;
+    border-radius: 4px;
+    padding: 8px 22px;
+    cursor: pointer;
+    transition: background 0.15s, color 0.15s;
+  }
+  .btn:hover { background: #d4af37; color: #000; }
+  .poem-box {
+    max-width: 500px;
+    min-height: 24px;
+    text-align: center;
+    font-size: 16px;
+    line-height: 1.6;
+    font-style: italic;
+    opacity: 0;
+    transition: opacity 0.4s;
+    white-space: pre-line;
+  }
+  .poem-box.visible { opacity: 1; }
+  .poem-box.error { font-style: normal; color: #a33; }
+  .poem-image {
+    max-width: 100%;
+    max-height: 500px;
+    border: 1px solid rgba(212,175,55,0.5);
+    border-radius: 4px;
+  }
+</style>
+</head>
+<body>
+
+<h1 class="title">DEMOCODEX</h1>
+
+<div class="row">
+  <div class="panel-left" id="panel-left"></div>
+  <div class="stage">
+    <img class="bg" src="assets/copertina.png" alt="copertina libro">
+    <div class="slot" id="slot-luna"     style="left:50.5%; top:32.5%;"><div class="fill"></div></div>
+    <div class="slot" id="slot-mercurio" style="left:29.0%; top:42.0%;"><div class="fill"></div></div>
+    <div class="slot" id="slot-venere"   style="left:71.2%; top:40.9%;"><div class="fill"></div></div>
+    <div class="slot" id="slot-marte"    style="left:37.3%; top:58.6%;"><div class="fill"></div></div>
+    <div class="slot" id="slot-sole"     style="left:63.5%; top:58.2%;"><div class="fill"></div></div>
+  </div>
+</div>
+
+<img class="strip" src="assets/striscia.png" alt="striscia legenda">
+
+<div class="controls">
+  <button class="btn" id="btn-decifra">DECIFRA</button>
+  <button class="btn" id="btn-reset">RESET</button>
+</div>
+
+<div class="poem-box" id="poem-box"></div>
+
+<script>
+var colors = [
+  "assets/rune1.png","assets/rune2.png","assets/rune3.png",
+  "assets/rune4.png","assets/rune5.png","assets/rune6.png",
+  "assets/rune7.png","assets/rune8.png","assets/rune9.png"
+];
+
+// Poesie cifrate con AES-256-GCM
+// La chiave è SHA-256("lunamercoveneresolemarte") — non è leggibile nel sorgente
+var COMBINAZIONI = [{"luna":5,"mercurio":2,"venere":6,"marte":0,"sole":1,"tipo":"testo","nonce":"sEJwZFTzNA0uWDIubLQMwg==","ct":"52kq1DHmun/drdrw7PYE3VhkOtiwYAgpyr4WnOewJjHpuPEeCLEAYwhqULm+Gpm6zf52UcGpB5mESvH7Mw2iKFw6JuGAzXMTb3ndwo6nIVOFcX1fLB0dmu1WUCxPY0+amutdgczYLMU4/59hLAECdzDRnRy0UqHhwzwBc9xyEe49a1qL/naQzHBmchBKHs1T4417hc3aMKZcRemESGgQvenfiBXIwvqHcLCQmLbf9FH5CyJoViCv4zi/M3hzBY9DUD+5Fi0C93r8y/Pu/SDqbPV3LOUthDMV4b4SU2FqUcBLq2g/PGbRpM1va7f1D5sW9EArsdOtNdUH0BGwUtzm5K4tGiEFiYp0+7uvojWGkpRtaY2WGx1OQDBz85eVpvsnnuRijo6cI770W95XtxCA19VIzEhtrI3kN1stUwUinSU3Oa3k7ns=","tag":"Y4pv4pV4GGMMNwDi89/bXw=="},{"luna":8,"mercurio":1,"venere":5,"marte":0,"sole":8,"tipo":"testo","nonce":"Jg6Y/+5ok3BhhlngxA3tRQ==","ct":"M/c5nZUDuU4ZzgGoIG3ZGoIAttYHBYmqkE6ZEnbxQQMpxVkixzpCkEFJNAn+vw04Tnf+KkuAuaWEG+TcIuaEczOt+W4txNZIv/MrHRXQlN0uug/JAigbZED2peXvzXku6RjXHfKM/+pP02Sqvx9GJqraS6FkAGCa0k6ZVfhA+eRZMdwFosv4OYclELeNDfHWcLBFk+fXrIhOHIeZd/k+RKjV6B4cSif0yxhSxzlKXPEbk3Sy7iLHq/eNrjF1NCCpcZYkP10ljyrzSVNPpGt2sWxx/Bt/fP1y4YWynWrO56spNCb7n7QyHiGo65JRccQSeDwYdtLA3zTwFjrJ82Do/kUv/imr46ZZvCCnoWo/XWXiJmQKmU1WIp6nSL80nvFdnaqJgjL9V5HCB3ygOfBy1+d/zQtRvNrroUjciY59CJ4jUhhNpOuvX2noZXv7Nf4bTyaq41B3vgxHGwACJ8fSUgI=","tag":"GMJa+gUbkKen8MEUSMJirQ=="},{"luna":3,"mercurio":0,"venere":1,"marte":6,"sole":6,"tipo":"testo","nonce":"dpDo0YnIM8Q0vRJSZns7FQ==","ct":"a1hZ7Lt4CNKVUFXLF4MpNhwXLwDtN4n9pG7Jq4MP0rTx+Y9CYUWd8Uo9U3/lNZLT/dE6J4kKaFiUtWrLng8tcpCnxruoNoX4FhS8gfP3Xx/4pffjuWHbgLrqyjEWwwzmYtg5LFsNHk9S15HaXCNXk8uAl2K5vM/letrUtdQEMmovgePOfwgjNp6VXmXM4XS3yUVxSntbTB+Wn+KmeQhIUJ1HgzzHYt/GpL6KuHLBGk/ugdB7JEwApf1sRZjTECnqr/qubue0BOf/MgkoGcjYxqcNfoGAKPeQ41trKn8xkDphip8/pbc3koncGcaNxe2vAqVBTiuMQlxJoZx3RRe5I1z3L6l1AOK5W0oRig/RcWxJ/TD9EqCbnPBK3BkL7r06GzlEAqix3CnV069OJ4iKy74nKUBXYiS1wKVmbGhco2eJhYb1v3CVar2lGA6JtTtWgJLQaKKMy6RshGnlcCMiEkHFC2eQZ4meghk5WQnp/bg1Q0TIyKNeZ1UolsbYw7wWcKuUY5NKZVVe95Lo6r6g92YjnlOXmrmijSisVgze5iX17lFP1GqV8j1koTOsfychyAryuX43k335","tag":"MqultJiBNnvaPgufrgq1Eg=="},{"luna":1,"mercurio":3,"venere":1,"marte":8,"sole":6,"tipo":"testo","nonce":"w8U0lIEtpqEN8GXarBorsQ==","ct":"MCN3ptOGw1a0t2nI4AwWZdGVg7BEDrP4KN9YdRc3Of9cLDKHmouoYsOO3VXBUWwcb2oJb0lt8e9c6Sa+PxNuS35lZP+6GeHDx8Bb0FLSF9LdGzp2z15vuElda4SUWNd/AJOVz9YWgiGNm9L6rS6pF0A1iecCOSn2F1GheZO7evCsLKZCR/rL8y5mHUrDd0sR/CWyVSzeTW4DhKUW2CYI7y6SMGHhfhvW5A==","tag":"XTpz6Ye73MXW9E5wi4GbSQ=="},{"luna":0,"mercurio":1,"venere":3,"marte":0,"sole":6,"tipo":"testo","nonce":"0NI00adlxJvNXQQTnJ6hKg==","ct":"hciotQ8QZwQLuMj+HmiYtKYbySB3OGKirPc02xrlbMGL+t2iwi9NYwwgsng6LLxgm4Qf/S30FSbFVZzY8JHCqJ96my1a1/rcXnr/CRvaQR/sh9/vc4U2+0zN4w6NeGj8RKhGO43OzQB7dgRnfvRwOW3R6TUYPBOGdwkNDWOq3Zn95IuQBX2DUwRTBLl4LPVK6CDsfVvH4fHWYlDUk+Ze5L6u3pgb+D0jYkEfvU/MJZ1Ymv4EVwfHl0hjurYQtoNMAUbs5YIFpMOH+JBKpaF3hv8McY/gPPj8ccJgH+Ps0qoNu1R2G41NQD2ek0wxiNeR7m82ArfyKD1Dieue9+thYATIxakg3zKLfV+NNneyKX5A+g6W0VZF59eyVgStEHO8MywyR7YdgsTyotegfzg9xH4cYZJtNtaRkjn0efCY0VMwqA3xb8byaA8lGnaORl7JkO6I/f2JNhRyQeCYFbzBcghMhLAzJtdSARYVhQM=","tag":"yhIufU5sOTtOfJl3qj3HIQ=="},{"luna":0,"mercurio":3,"venere":0,"marte":8,"sole":2,"tipo":"testo","nonce":"7B/minSBElST4D5q4geecA==","ct":"DtlaL+78dUTRelrwLRB0Jf3BN+GojrkBON5qzh68IvU2dxb57Nfkeq6UjRQocHBuGsp13hBUQN0Sk0emiPbrh9aym5Mc6RoGIyvbsyF+yBxrB5f82YLSm8IG6tYrT4ahcFVe8wIsE74vFVxuZEjt0LoUlSoOJPCzUqTqDHrOgqoUfI2oWDvhl2QXUSTeX3uWnqZzn/o1FeFmX/A+QVCPoHT5Q3CX6324FsxZ5SZaH3zWmpAmeT7mOdmhQtznfZWwbCZwKGIM0Cx6sv6cSpyO811k5xUvHiVrs8OW7wOm3+zTQ6ZpurzLXKA8VK4yTd0Cc1htGpTYTlA4IUa2hlyaP0n85ggzokHNrbsNsbiV2SumdI5orVplriNtqZW40Echa6WqEHh7bcwG6Axxx2r00TUNZMgJTvjxkmuKYF04kb/R3pQBMlvQBqHe+qlkspR5Lm6H3HqNvsoeCLnX/tHrFBQIoHReO0vvvGMtLf4wJKVtd2suLQw2UODAoVm4EXpjfrziz8dmLroDLg/J5R+J7Df4RknJ9QRwyFNgihE=","tag":"IeNptk513BlpGxkODMEY2g=="},{"luna":4,"mercurio":6,"venere":2,"marte":8,"sole":1,"tipo":"testo","nonce":"Ls0BafImIlsnvH0sy8mT/A==","ct":"GgXmZjoDxm23oHHjv7vNwWSjX/+HRA+7lJOmqdgzIWDJY3wPtkH1DvEpJ95p/3Cj93QeBY5l7i6q2f9aj25vTom5uWQIJjUOI9zGcAjQYYn8DTZgcBdSOTlDMDUDlvgTRhxBg31TRRDIafOl1gTtvQOeU35sEOPZhF9RHUfF7iR3PgOXFtLyyRWVKQbgyRq1eoQmtk3DEnq+8YTetaR2WYEwK+xoE7c99l+eiswT/HYBlnuks8UgzO1MwjRvpL02/1eOLjmQUXaT5nCh8Ip6v5lDPtWjC/+odqql2snSaFgiS6aQLfqVVpPkQzsKWhnfK9QHJ4DiB1y/TJVdtllcOQTplI10yELjND6/y2tWGvDZ510RtRfKmVqQUpXAKBpyh6RDzvfI7FAsinCyfDjbUOtmznSSLE0lIfZWBik7SVfoGxPG+BRc0y8u","tag":"RVVZWI8fOWKrgeVtLy/25A=="},{"luna":1,"mercurio":4,"venere":4,"marte":4,"sole":1,"tipo":"immagine","immagine":"assets/cartasegreta.jpg"},{"luna":2,"mercurio":7,"venere":0,"marte":3,"sole":5,"tipo":"testo","nonce":"P5NvnFTEnjQ3CxPjOS3BvA==","ct":"rHiIjb0FhZmNi5FEd3wz7SiGsM/sOrMjaAlqk4DhDbWSJaI1/mci67dDxr7rXUfeo7LwuEfIXly2UVSg5e9gzTRXkrlBo/IbCo+FTJ9sU5My8p2zDD5KkdJi8PfadM9Q1e/sivY235cAq4zMKzL9O0sCe16TrU7OYLj0CVImXi1I6edsyRpV55xH2Ab4rObMzL8cU6dq+k9lHNdAOTNr5PtVwEqOiwp1/3j/swzJvvXVoBMFrZ6K/eAD+9kRyeivPjmfuPxQFECI/zYXhATj0Ig6/JDKag/pUFvUOr62xRsv869EJndFx/ecZNGyCT4aLkhfiiHV4+ponuAz2qJVaco1CT8a99zBxULdw8JVN3iWcxFhoJBIXGVjr1BDPmP/UgVcH/njCgI08cQp","tag":"gsQNI59UqGQvyTvkvGFT9A=="},{"luna":6,"mercurio":0,"venere":7,"marte":1,"sole":4,"tipo":"testo","nonce":"iIwRHnjRQeGkeYmtQKimiw==","ct":"izxXkEsFbE4Xdm09b1yF0t1KGI23Ud3rRwDwHA7dZt09I0J1No6TrfJNNadUqjcSo2bbUk3fLLHUQFwyradDsMIwzNvXNtFa6JoaUdFJ/6dgYO9X38O4pJe6TvW+3fSSvKDkhg0olfp5csHYT4hsnv+5Fs/uZYbulfzZhC8jsU7Kzr3/neSOC9121Pd4Ta/n","tag":"qD6d112ZJwfuuhoQfsynKw=="},{"luna":7,"mercurio":5,"venere":3,"marte":2,"sole":0,"tipo":"testo","nonce":"RGtl+pL9/gXib2pakrXOtw==","ct":"31xCrsQAUGvOI62iB9lscSfbD6/k+iIThAAny8Q2yBSvQxZOwoxbS5k6m5CxRk5qIy9vMCcRMMyXPQrEmI8nyUfsKZfBntK54ipZ2QtI609lSwCR6eBmVGdRgdQWStgc+eh3fDGmL+npnZil4G0EwEWQUjNlEyXam17DmfkaeBvAKGWbBVkU8p23xVs0NlCnlG/S1kzt+wCfRvdQaXXzoUeZgRr+BzYaOFcsnOhcv7nG1ZgPOJ6U86yEdLfL+07Yo2Y0lKMKQhhYphDaMjZxnAflsdsCy0cAAK6D0dvSa+yHYjgMf/NirrcrN5fUCwHcHWFuJ7rv65osXk8tC3/P+L3nBfRMmnaQXAxuSexm/gIEERBLQnsXncdKn1sTOvhSKaRx6qY6gc4SbKdMr95LrLUVZBEfTUe7jmPyu4iRsipCKXYOQsnKHl904krpQaYe8i7hH0ji6/6Hz+qDV51fjC2bn7divAgY+5XS8Ds/TenVA6D94K75Yx2iV7SZe4696AMRuFLL3cjgRpEg6BNipdLlbjInJi6JMkB+SsJLDhxh+55HJP61GWCjvE1ueAFXmqiMdOXYGgEWEh0voHYntWt6ViAzYIZ/5vFjoCNIajkOmWq/BhNRIDN6liDtGSbkZhouQIhujuC/sKSRdifss4JZI9P4+paEjR0f5R3GBWUORICO/6poPuNXl9IRdS5+HpFaU9vfzWe3DIqePKpTREg1TZML4nIg1Fc5dmVXn6joTfTK2kaKbNOpQ3hP9E6C8dWktMrqKZABnznHj/Rt69b2WkOVZ48/HiFU1STQgLQu0tKRN5pvyfxrdfEkS9IJvwsclnVrRIB3Hv7VSbjvsMbdyOJYSYMpcDQfgAAfQ9U=","tag":"5Nm6S2Q4UdFwfss8ylqMCQ=="},{"luna":3,"mercurio":8,"venere":6,"marte":7,"sole":2,"tipo":"testo","nonce":"B0OAuOSm8Vv4nE6r4xbFfQ==","ct":"cKEZb07gvZVhUlAP/SnoV2bDMbd7RsJMHqe2RCiFxXxe7duyrugXxp73D3CksY/BYBUxCGXlzLoe00l++8wyuiNoRq1tQm7gjSMsdmNKdIrZk7AjpdrLVK2/JMkNJsxVJpLqvLUPkYkrTN28f5IZ72AjBsrGoI6d2AXbkfqsLYX/lc+ddnT9J+dlDhjFQIxgNnryY+UaGyMOrWIfpQCLL1f912FH23iWEBAXL9wBd+lLDogUsUpECv5CtPmsUpZFQ/JrzHU1UdBGT//jz8SRcgvFqQmjlfffuVDQg4ZtH4/5GrvesHtnzmeWHd/zRQ==","tag":"QoaUuqV9djlZ4jyr3OPA6Q=="},{"luna":0,"mercurio":6,"venere":8,"marte":5,"sole":3,"tipo":"testo","nonce":"54ywBPJSfZZXG3FR+K0WHw==","ct":"DN+VUB1fouSz2ntdy7JrlZ4/fJdZXWObA/hiGYz+XyDe+RuYaTsZEEoJMvxnBy4IMmGNXTJupXvFeLYbyCUl9JsAAi0OH4xAMbyqVD2HoReAd8aN4Y1FbTULBGjFOsSL3hNLEHKY4OOZJjDdsag=","tag":"r+kZ2oU/1IOTsByYqZFisw=="},{"luna":8,"mercurio":2,"venere":5,"marte":6,"sole":7,"tipo":"testo","nonce":"qQ9HnA6x+dfg4vjS9rc8ug==","ct":"+hUes/KduAWJaOJMYmqFqhjT5jmgmu4S6gEX4cGi7ZpM7+12RCvv0ZCgaU7lhmHuOn87tDQWn5+a7OsE6hT1tJoFuhAdRGlSTG7zzmRiCSAS7QQRhEl8eHJLPaW9Y58TTG+v2cYUKCHkBJYc/orhX6hSm1Qh5vo2env88JpN+adlyZ5gXHl7D1WB8E9iiz30JkPVEOuuNt/YdecfQeHeanpBspg4NhsqULfHtzom7nuK6kDpuqV+37CDlRONXGQ70io/3t/BGmYx1V8/dKNn/l1iXcv+3wQ8hRs1+6p4z6XCAgrkfXJGc/VcaQZ0Ji9d/drQXxMWdqR2vQjxRRfj1g1z554Y9mMN4u6gjb8bXR75aDAcVyHzNhI0zCQm6DA1w59FdQ==","tag":"O7ghdWFsA06Cb4XHB6Vjzw=="},{"luna":5,"mercurio":7,"venere":2,"marte":0,"sole":6,"tipo":"testo","nonce":"GjUEpuXk7VLPNHKLifwhmA==","ct":"W5RygLVabPMwc+mGKv9a51M32ktc27jWUHDTCcycnPc00QTeh2J9tE5oxt0FWc9VWLaOBJRPFhv0udTX0BJnKQawesMVKkjX2BfXtLyCgbJAbcj/U6t1Sxexne8bWmo+y80yCfY1dZyAtK69HBi8x8XQljuUnRTn1N6IgZtbxKsGv4MAm6VSLWXhI6AYBdjz+yT3vavG4lDrPOedElk0vxw25xVIOdNTew6VppS2GqC8KdjM5JSW9SYw9SgAZPyciGQebd3kFxjH1mFg7i+fvjrCfN4iz9ojHrr24eNkbLNBNEWoOi42Nevs9tv/Uo7u+9YAJ2aEm+KXiRK7/Fk2noi+ze9EYWIadmeVrSz58DVwx9AdmTKvWhM9mccv37QqapVQOlKR1tdLfVfY3/Z9zNXSxZFNXseMmELwoLEWG6YoOHM38SlXLhdrdV0cFSUEK99txqkdtqH4ehCmtBVnx1rl0DYiXP8EsJjEDs6ZNBbaAZEocs9sFkzdddRNzZYUkyFszal/IWZ3tsdh/sbIwtfimSzz4sosowBgVI9GygsjnQ==","tag":"sfIl7rjgAnRQUpX7bML7jw=="},{"luna":2,"mercurio":3,"venere":7,"marte":8,"sole":1,"tipo":"testo","nonce":"C/akuLtNaY8K649+Up9qTw==","ct":"yN2I5n6t3HsOp6dAk+F3BDFag3pIfjxZUbr368Bnzv/zeOas2giHysOON5xF3FL/Ilu/bF9lA948b8PpTs6i4BCe6GT4LGcVHm8wXZObHzy1DZxKsDEvron497KcgdcTErSQQqZ4VmADVr2sPjNEYc7aOFFGtAzP6YFIszDfW3v2jkzqTefm7S8Ko+jTh/P2ianJgF8pCPhs8Wgy934=","tag":"j/QxRY7DOc5NiRFPP295HQ=="},{"luna":7,"mercurio":0,"venere":4,"marte":6,"sole":3,"tipo":"testo","nonce":"Wzjjj5rOeqbBIPbNr8zveg==","ct":"sAvTKX06i345JPHcjE0GGoNwzPLbmd+ttIcLkR/UgBLHzMUi7MY4lfhsjEGeAHg1/qaYS99zXTpFttFH88cGl2QwDXxd1Y8VN1ksGhUuWFdC9ssk6wRpu8ZHQ+idUoxJY2B17TBMWvx5w69jrPZ8rbnBbziPjeQq8pfDd+osGRsVfXuonTGnlwSqAgBPSZ1+m+3GbnNo893AnoxjgCm6LFQWFNM56kuHsEU4Z+E596ZJPTGmje909QoA8wQBOUakFZFQl671Zdhr/KTK3RDy6M7Q+nxxwfgdVewAU7ygod6MdiIWmw==","tag":"51RJ3hq8vok/x5Ho2Nq8WA=="},{"luna":4,"mercurio":5,"venere":0,"marte":3,"sole":8,"tipo":"testo","nonce":"VtOPRdX2Ls2P86y4poL0Ww==","ct":"VFw/iNnWIRC1fyMPxYBbD89LrYTLNY7i3FTjcodiLh0U8yyi/gfCC9Px3oXwakt3Ujj1aSOsZRQfYklxonHojb5aamr9X2O2u5qWa7zkf0m4s/1XZy0MyirVfoqDAQ3rcHDJm1UwscH2N9ainepSzKP+6fSn8X7ZEyYIwcbje3CtersyUL0XqER/s0IsatSWrQ==","tag":"P3HEF1d7hPYg2Co6mgn84Q=="},{"luna":6,"mercurio":8,"venere":1,"marte":2,"sole":5,"tipo":"testo","nonce":"+1lwXcio57rDk2L6EjKUZw==","ct":"6FamtFcWbH7AXFSgU6U1+WSsIsINHbO0/mGWX3oVbUGKp6Qj2XRxbifmtT3NUoWW3cLtzM2VA1qZgyCeGjjOw/+1ov2KA/39fWqByASMLZgnBIOuxwTHhY7nYYjrfqTWl4s3pwLJzr7MOJ+odRV4hhyqVcUuK/YtQzmpoY/Z6Pw0/yx3EVgDC62lvgOTKPoMhadxsUYwydoGz0/PZd1F291LICghA0QaIxtgitBc4VslTDCPhWG1ADTNJv11eFB5vHpEtT0gZSdYBP7N0aHbEOXsaqqlWSdTTwGUeuB+/IV/6O5GQEmRXuPK5YBzdk8dA6HFe6t7nBmaoU9nQSy1t3LIpV3C7Iz3mcfBYYPJo/MXPnuE4w==","tag":"/jaNKIMYOLYxUefpuPDEOg=="},{"luna":1,"mercurio":2,"venere":8,"marte":7,"sole":0,"tipo":"testo","nonce":"wO7RS8nm2TP+msjOdUUYtA==","ct":"VdLW+4UvEkeGsSfwQ2FjCRpMLEOcOuEgANdFGPB3Rdhp/VmgM8x/ebFfSccM/AWQQrpggA9rUKFgVMwy2KVMgAF8ITyNxUxitXV3gYC86+zc8eH9yP8Owj92lp6Tsaa3SAvBgsf1NiXTe9zwxQcDQOMafJzZpGDdeVC8b9hX+5CY","tag":"ArLKhqy5Tza1gwIkWYuQOg=="},{"luna":3,"mercurio":6,"venere":1,"marte":4,"sole":7,"tipo":"testo","nonce":"J1trvIy6hINADStGlwaDSQ==","ct":"6jdD5v6YfHCUzMNecyZ+8P3tXE/84K+Rlh0oEqynI/DGm5wKVvVX4b5VPRBt+42jntIabKDQNxJ7TkmBT/KbGwKl0+9hfEKPOjO+k4SDHpe6R5ZEhpKYjr9fZF8WBEu3/QThn4XozoehP72xKbZyZYxo","tag":"GI+b1DTvrOXYOBVCECBO6w=="},{"luna":8,"mercurio":4,"venere":0,"marte":2,"sole":5,"tipo":"testo","nonce":"cq1svCwfPPz3ljfgu+tf5A==","ct":"68U9KNTQNb0PDLE126xntwW8b8SJeux6aJcsq3AEAA4AGVjp1qTzI1PqLI24f6NcfEcksRVkltRjhxnVT88DxQ==","tag":"9rh99ma/t/ch1Sgq05/KMw=="},{"luna":1,"mercurio":7,"venere":4,"marte":0,"sole":3,"tipo":"testo","nonce":"/gAs0Zt1G1nx1JiKDNY55g==","ct":"6KTKdbBVme6UCGFDlxq/q1kiuu443QWHdbXOO1tHZ9SnprjltkXYDIrzc8Nyg4tLwA+I2owiqWzXUgC71VrXOfrrrJ/xFM4xFGt4n/1HMz96DAtT/SZBigcDsi9W6QF8CjnPWR19D4S14b3buTUU0V9A2yr4ulCneYmwWNA+gw==","tag":"eI1b8EACgn52v49VOl1hqg=="},{"luna":6,"mercurio":2,"venere":8,"marte":5,"sole":4,"tipo":"testo","nonce":"LTP7GDF8pYWztPwRWGCjIA==","ct":"N/5fQwHCtcWDt5DpW2EpFnsgqbviuPzEJ/XLVPYcnBnyeIUHTEZIWK81Zov7MvIwG6+1oFK0/T6iRY/z65Sv4FmBPpiTyDryZ99Fth2vhPvswJ/vgolMj+GFZ2a7Who7DhWw33oC6nHr9+PiDgQ2lBO/z1aVyod3FQ==","tag":"Ih/BYJMwGxe7EyPiwS57fQ=="},{"luna":0,"mercurio":8,"venere":4,"marte":7,"sole":2,"tipo":"testo","nonce":"lHeyrqbI+6bwN3sP8yynpQ==","ct":"OOWhggtJk6GSDqEivDnaPegAs2oKiasXWIaxiWSzYmoLjhWpfZAte+UxbmcDcFElxaCgz9jUlsCKDuBbr0ePPqjoiIj/ZP81WCk8hNaoDZVgLhlotk0CaZDKTLjJO0WOzPUZ+pnsL22dU/ldbEC7qBd8jMg84id1wsVZOkOQ61r+x7/vLKuRbsCxk1BqWMy5bRzWzOnlx4qCOPjuGNz0QWn5aq1sYx9GYu4hbxdr/I67NfQE2tKGJuaOGockUtlyfuSebQmt","tag":"CXBPWpuQgJRGBjUY1Mn4qw=="},{"luna":5,"mercurio":0,"venere":6,"marte":3,"sole":8,"tipo":"testo","nonce":"1T593+u7RfyESQx5h8vZDg==","ct":"BUyTLuc7fuOAmJuD9xpn8xAO9GQ6NYOVTCdLhjcfKm2VNkO658dkJUOJmYpF5AcKTkplcrC447Xk0wT4aUyLG3vZkPcrJFIjPA0XVS4mwZ5H91QbMI5K03Ra+xHxADOiCgf9JqK3hAjIqGrnEoMBKPfkH1pIgIaeCf2yBJAYGZt9BDzTV1Oo552JVwVEYrTkO6SmGcEHInZbIRNqDnHACdEbI1HCKbLCYoU79uugbzmNTK4E3xnYqlyCDkSBv1pJpyYE","tag":"bKlk3xeOTnGp4oQ4MYm+ZA=="},{"luna":4,"mercurio":1,"venere":7,"marte":0,"sole":8,"tipo":"testo","nonce":"ybCJCZxBov4RgbePuA/GsQ==","ct":"06CgTBQJlcx6KV29r8XHE2+XrhC8zjqNLDVAG3tSTR53XnuSq1AiDEU=","tag":"DxhPgCzvNxXYZqe3Zxw6SQ=="},{"luna":7,"mercurio":3,"venere":5,"marte":8,"sole":6,"tipo":"testo","nonce":"T66G1VmXm5tS/ypNk9B2sg==","ct":"Xjp3PFNxW3NOugj8y2NxRNk7DTEC9Pagsyr6QXXFavuAwDMQm2eUZla4Yoj9syOvCViu8pXyY2cXWwdmt0v08dRIFNwFTLPiUrruaqkNpFrSNSHVdQAYaparwmKMIYHykCzHeeXL5VRG9oZbmjQcNZVgEJqiZH4I+QM9VuTJRBdSXYVtd/7DnbFObxiRx0996jHUAvc=","tag":"X29M8wCblhobJ3yGNcQDkg=="},{"luna":2,"mercurio":5,"venere":8,"marte":1,"sole":7,"tipo":"testo","nonce":"B0N9JVUPIve8aoauBNy/bg==","ct":"6Rwyoz7nZKxiDR/T1jebEi1d3q82vlRhBmFANIUG6aPTAi1qLBcEjga08tF9Wc5Qkz33q/y2kWmoPaBDAvxc5Xz1xWWFiTzzzLJY6YlcAD0R9/wCPLgohlZhQ1nNg0sBGcxo7PLnFgDDhM6LXn2RWLs/ZrKvCLkm17goiRMTwLeNBcfJThA+510cyNmQiljlEcOSPlE/81MMN9YJj0MDUXTQ0ai0on7gNqlV5mcmivSGVVVIu9bnHEODzOCy4WmQKGitrMjCnKpOX6d09TC3KPc5P5j5wX2PxLFLaIe0RhpldFvaPscjYWZ9eoi4td3bGr1dCHdjZJyHjfMXCi0auV4bzA1EJajxmHcnvt794c2uWjH8fO438lK72VqRQUnW21m+fg5wPX4MpLo5febAXIuu8FWKdKwPG+q3ypgKOa1B0OKfKsio3YsQN4NwWXNr284nh37YUUG8q4gVjp5QuNkEj4Uk/6+yxeci+0VFf/Up/fncgt0xmRWVZHe+D6Vktt2C8s6ekhrkQJ0LJGKPvUBGiBLy+IKUCtjkRTP3fo1mz+go0V4HoYBjgqbCWxnvX8p8EN7sTL07tvykGGRpXMyiGmnmJaFmpw==","tag":"E978Zq8r/rJw7FJK+hc/PA=="},{"luna":6,"mercurio":3,"venere":8,"marte":2,"sole":0,"tipo":"immagine","immagine":"assets/mistero.jpg"},{"luna":0,"mercurio":4,"venere":1,"marte":8,"sole":3,"tipo":"immagine","immagine":"assets/volto.jpg"},{"luna":1,"mercurio":0,"venere":4,"marte":3,"sole":3,"tipo":"testo","nonce":"kwhFIYlFIcbXPUPBmx83aw==","ct":"ltscBV+eCz8/l7QI8kgl/WYEVsGeNW70Dru9K1tLEQs9jrhH1nHkEJ2UG+o1oRldDmWbegq5tm0L/cVcai/XnZiq9SVYb2MoGOXx6668zK8AGiRxgNINbz8Jm7L9HTs8T2wh/a57aKx/lJ4QFoxfUDVEp7qo3U9LIggEb3Bpkwp/yjbGqgedWog+Tiu431YGO92stP1nomOTvYt+JTO5UqMGVVXVyQqlykAtxcKTJFwZ+0IcMwzmRw+D/UnDHL74FlxBYdyT83qUrBoMKj1W7pslIpDnAbtSHBEdVy3BtDGsA7IwkWJnH+Bpl/IgZ+6nvef7iW8EkI9zdE7TwU7IjbcUPC6wOu59Zp25zA==","tag":"FRqMYqhqAmz2xyV+Uj0bcw=="},{"luna":2,"mercurio":1,"venere":8,"marte":1,"sole":6,"tipo":"testo","nonce":"+NYY7GtHPa1zfT87HwEkOQ==","ct":"R7nszfqFTzL6/AhPX/9dzPGmo8d+/C6KlpNn2i7dUawA7hOqAErueP625rrU2a8/0QXZLQi8fzQeCyv3AnjNubYnrqjthPB9s0O9w/ALbVr4Ge9ombeGxwM6OdyU7oUR8bB1T5EP6WqXBRUncSCwfDiyD/5LMgAddSLZFuNpI5JNxb40M3gOARFRn7HVmarBvarbugCks/KXaGs/UPL8SvRF8+vGmvsiN04iivDSN1npkS1VUVycGQBDLo6Axoi80lOu8aHd+uXIErmOYkGPyoFFV9dZ9A0KnL2y56D/WEAR1lLrC2iVqkzL7IQ2oy2nxpQ4ZY1VDlfAFXNu/JPSlK0Fc/S8M2wceqlW7BRvefxFxr0/MAvqiL7SaVMaskL6iaNTaoRmpp8WqPDgqcSERtg7+t0T2jQ4rqVnXAiBG4MCn0uZsqoRYEoFlVUoCzH9aWna3aNnTgbbN9LmJGSbTg4lS6/Z/PZCkRgY+s270wyQCBIDAHwM5KwzSLKBs9c144E=","tag":"crSdDH/wGqFeo0ilDlfEBQ=="},{"luna":0,"mercurio":0,"venere":1,"marte":3,"sole":3,"tipo":"testo","nonce":"eZH/jQUDlC1TLC83QnI/pA==","ct":"HD4s2/CA4yHmjoYweBVqfS9JcqIBxtJFS3p8MJE83Xhj/fNijV8la9cVHWar0hP+mxeNATN77oSRPcR7Id2eshN9Bz1qTSc0OG1qAoADZr2Ksjxie2u6kiVwWWTp8p3mSoXIElqxnH3w9uyYe43PivdyeQI0nsPGDb/S8FM0cdn6BfVtK2dbsp2thpydPh0I1Kh5FHjH5pGY66hkj6hxnODvJ6eBKwkreZyfD0gXWi97HLxmux53xxTVfTByyF1Z1PZuLPCgWG8eUA8UL9zOGpXRKHdfWV5+q6HccP4ZtYXioIQk8tEM4dc4S9Dqe9swdBP7oHM10BesvN4Af1ltyRL+4icH8FuhoCIMWXY/qBtuo4b/wczJEy7qCp3rtQIxNNxrwuR5YRMq7dilH9v/Cx7/NHKeT/0znKE6dYcGnvqJlCSFxl8O0Jpmpkfre9H15ThK6DbI/YHN2GptgC1MunyjJ/uBhrpkIwf3zgNsJ0iGeelv7V+XKhb0og/EfaXGWIHlFUJkM2K1fu85K6GJL2hbukTgb2aXCz+fClB28pzV+fh+95bZbQbXJvFVLRFHYYb/eHBs+5q/JIvhIM9SJTqKJ2zOuGTK3z2PKvy1","tag":"MMZJ+9Y86q9UMYX9V/oRGg=="}];
+
+// --- Crypto helpers (Web Crypto API, nativa nel browser) ---
+
+async function makeKey(luna, mercurio, venere, marte, sole) {
+  var raw = "" + luna + mercurio + venere + marte + sole;
+  var enc = new TextEncoder().encode(raw);
+  var hash = await crypto.subtle.digest("SHA-256", enc);
+  return crypto.subtle.importKey("raw", hash, { name:"AES-GCM" }, false, ["decrypt"]);
+}
+
+function b64ToBytes(b64) {
+  var bin = atob(b64);
+  var arr = new Uint8Array(bin.length);
+  for (var i = 0; i < bin.length; i++) arr[i] = bin.charCodeAt(i);
+  return arr;
+}
+
+async function decrypt(entry, key) {
+  var ct    = b64ToBytes(entry.ct);
+  var nonce = b64ToBytes(entry.nonce);
+  var tag   = b64ToBytes(entry.tag);
+  // GCM: ciphertext + tag concatenati
+  var ctTag = new Uint8Array(ct.length + tag.length);
+  ctTag.set(ct); ctTag.set(tag, ct.length);
+  var plain = await crypto.subtle.decrypt({ name:"AES-GCM", iv: nonce }, key, ctTag);
+  return new TextDecoder().decode(plain);
+}
+
+// --- UI ---
+
+var panel = document.getElementById("panel-left");
+var selectedIndex = null;
+var dots = [];
+var slotState = { luna: null, mercurio: null, venere: null, marte: null, sole: null };
+
+colors.forEach(function(c, i) {
+  var d = document.createElement("div");
+  d.className = "dot";
+  d.style.backgroundImage = "url(" + c + ")";
+  d.dataset.index = i;
+  d.addEventListener("click", function() {
+    if (selectedIndex === i) {
+      selectedIndex = null;
+      d.classList.remove("selected");
+    } else {
+      dots.forEach(function(x) { x.classList.remove("selected"); });
+      selectedIndex = i;
+      d.classList.add("selected");
+    }
+  });
+  panel.appendChild(d);
+  dots.push(d);
+});
+
+document.querySelectorAll(".slot").forEach(function(s) {
+  s.addEventListener("click", function() {
+    if (selectedIndex === null) return;
+    var key = s.id.replace("slot-", "");
+    slotState[key] = selectedIndex;
+    s.querySelector(".fill").style.backgroundImage = "url(" + colors[selectedIndex] + ")";
+  });
+});
+
+var poemBox = document.getElementById("poem-box");
+
+document.getElementById("btn-decifra").addEventListener("click", async function() {
+  poemBox.classList.remove("error", "visible");
+  poemBox.innerHTML = "";
+
+  var match = COMBINAZIONI.find(function(c) {
+    return c.luna      === slotState.luna &&
+           c.mercurio  === slotState.mercurio &&
+           c.venere    === slotState.venere &&
+           c.marte     === slotState.marte &&
+           c.sole      === slotState.sole;
+  });
+
+  if (!match) {
+    poemBox.classList.add("error");
+    poemBox.textContent = "La combinazione non corrisponde a nessuna poesia.";
+    poemBox.classList.add("visible");
+    return;
+  }
+
+  if (match.tipo === "immagine") {
+    var img = document.createElement("img");
+    img.src = match.immagine;
+    img.className = "poem-image";
+    poemBox.appendChild(img);
+    poemBox.classList.add("visible");
+    return;
+  }
+
+  try {
+    var cryptoKey = await makeKey(
+      slotState.luna, slotState.mercurio,
+      slotState.venere, slotState.marte, slotState.sole
+    );
+    var testo = await decrypt(match, cryptoKey);
+    poemBox.textContent = testo;
+    poemBox.classList.add("visible");
+  } catch(e) {
+    poemBox.classList.add("error");
+    poemBox.textContent = "Errore di decifrazione.";
+    poemBox.classList.add("visible");
+  }
+});
+
+document.getElementById("btn-reset").addEventListener("click", function() {
+  Object.keys(slotState).forEach(function(k) { slotState[k] = null; });
+  document.querySelectorAll(".slot .fill").forEach(function(f) { f.style.backgroundImage = "none"; });
+  dots.forEach(function(x) { x.classList.remove("selected"); });
+  selectedIndex = null;
+  poemBox.classList.remove("visible", "error");
+  poemBox.textContent = "";
+  poemBox.innerHTML = "";
+});
+
+if ("serviceWorker" in navigator) {
+  window.addEventListener("load", function() {
+    navigator.serviceWorker.register("serviceworker.js");
+  });
+}
+</script>
+</body>
+</html>
